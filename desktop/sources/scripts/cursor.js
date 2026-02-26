@@ -13,8 +13,9 @@ function Cursor (client) {
 
   this.ins = false
   this.pinch = null
+  this.touchFrom = null
   this.wheelZoomAccum = 0
-  this.wheelScrollTime = 0
+  this.wheelScrollAccum = { x: 0, y: 0 }
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -181,10 +182,23 @@ function Cursor (client) {
       const c = this.getTouchCentroid(e)
       // mode: null = undecided, 'zoom', 'pan'
       this.pinch = { dist: this.getTouchDist(e), cx: c.x, cy: c.y, panX: 0, panY: 0, mode: null }
+      this.touchFrom = null // cancel single-finger if second finger added
+    } else if (e.touches.length === 1) {
+      e.preventDefault()
+      const t = e.touches[0]
+      const pos = this.mousePick(t.clientX, t.clientY)
+      this.touchFrom = { startX: t.clientX, startY: t.clientY, pos }
     }
   }
 
   this.onTouchMove = (e) => {
+    if (e.touches.length === 1 && this.touchFrom) {
+      e.preventDefault()
+      const t = e.touches[0]
+      const pos = this.mousePick(t.clientX, t.clientY)
+      this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, pos.x - this.touchFrom.pos.x, pos.y - this.touchFrom.pos.y)
+      return
+    }
     if (e.touches.length !== 2 || !this.pinch) { return }
     e.preventDefault()
 
@@ -223,6 +237,16 @@ function Cursor (client) {
 
   this.onTouchEnd = (e) => {
     if (e.touches.length < 2) { this.pinch = null }
+    if (e.touches.length === 0 && this.touchFrom) {
+      const t = e.changedTouches[0]
+      const dx = t.clientX - this.touchFrom.startX
+      const dy = t.clientY - this.touchFrom.startY
+      if (Math.hypot(dx, dy) < 8) {
+        // Tap: place cursor at touch position
+        this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0)
+      }
+      this.touchFrom = null
+    }
   }
 
   this.getTouchDist = (e) => {
@@ -248,13 +272,16 @@ function Cursor (client) {
         this.wheelZoomAccum = 0
       }
     } else {
-      // Scroll: throttle to prevent trackpad momentum from firing many cells at once
-      const now = performance.now()
-      if (now - this.wheelScrollTime < 80) { return }
-      this.wheelScrollTime = now
-      const dx = e.shiftKey ? Math.sign(e.deltaY) : Math.sign(e.deltaX)
-      const dy = e.shiftKey ? 0 : Math.sign(e.deltaY)
-      client.modViewport(dx, dy)
+      // Scroll: accumulate sub-tile deltas for smooth trackpad panning
+      this.wheelScrollAccum.x += (e.shiftKey ? e.deltaY : e.deltaX) / client.tile.w
+      this.wheelScrollAccum.y += e.shiftKey ? 0 : e.deltaY / client.tile.h
+      const dx = Math.trunc(this.wheelScrollAccum.x)
+      const dy = Math.trunc(this.wheelScrollAccum.y)
+      if (dx !== 0 || dy !== 0) {
+        client.modViewport(dx, dy)
+        this.wheelScrollAccum.x -= dx
+        this.wheelScrollAccum.y -= dy
+      }
     }
   }
 
