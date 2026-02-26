@@ -12,6 +12,7 @@ function Cursor (client) {
   this.maxY = 0
 
   this.ins = false
+  this.pinch = null
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -21,6 +22,12 @@ function Cursor (client) {
     document.oncut = this.onCut
     document.onpaste = this.onPaste
     document.oncontextmenu = this.onContextMenu
+    // passive:false is required to allow preventDefault() on touchmove,
+    // which prevents the browser's native pinch-to-zoom from interfering.
+    document.addEventListener('touchstart', this.onTouchStart, { passive: false })
+    document.addEventListener('touchmove', this.onTouchMove, { passive: false })
+    document.addEventListener('touchend', this.onTouchEnd, { passive: false })
+    document.addEventListener('touchcancel', this.onTouchEnd, { passive: false })
   }
 
   this.select = (x = this.x, y = this.y, w = this.w, h = this.h) => {
@@ -164,6 +171,31 @@ function Cursor (client) {
   }
 
   this.mouseFrom = null
+
+  this.onTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault()
+      this.pinch = { dist: this.getTouchDist(e) }
+    }
+  }
+
+  this.onTouchMove = (e) => {
+    if (e.touches.length !== 2 || !this.pinch) { return }
+    e.preventDefault()
+    const dist = this.getTouchDist(e)
+    client.modZoom((dist / this.pinch.dist) - 1)
+    this.pinch.dist = dist
+  }
+
+  this.onTouchEnd = (e) => {
+    if (e.touches.length < 2) { this.pinch = null }
+  }
+
+  this.getTouchDist = (e) => {
+    const dx = e.touches[0].clientX - e.touches[1].clientX
+    const dy = e.touches[0].clientY - e.touches[1].clientY
+    return Math.hypot(dx, dy)
+  }
 
   this.onMouseDown = (e) => {
     if (e.button !== 0) { this.cut(); return }
