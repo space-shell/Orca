@@ -177,7 +177,8 @@ function Cursor (client) {
     if (e.touches.length === 2) {
       e.preventDefault()
       const c = this.getTouchCentroid(e)
-      this.pinch = { dist: this.getTouchDist(e), cx: c.x, cy: c.y, panX: 0, panY: 0 }
+      // mode: null = undecided, 'zoom', 'pan'
+      this.pinch = { dist: this.getTouchDist(e), cx: c.x, cy: c.y, panX: 0, panY: 0, mode: null }
     }
   }
 
@@ -185,25 +186,35 @@ function Cursor (client) {
     if (e.touches.length !== 2 || !this.pinch) { return }
     e.preventDefault()
 
-    // Stepped pinch-to-zoom
     const dist = this.getTouchDist(e)
-    const distDelta = dist - this.pinch.dist
-    if (Math.abs(distDelta) >= 10) {
-      client.modZoom(distDelta > 0 ? 0.0625 : -0.0625)
-      this.pinch.dist = dist
+    const c = this.getTouchCentroid(e)
+    const distDelta = Math.abs(dist - this.pinch.dist)
+    const panDelta = Math.hypot(c.x - this.pinch.cx, c.y - this.pinch.cy)
+
+    // Lock gesture mode on first significant movement
+    if (!this.pinch.mode) {
+      if (distDelta >= 10) { this.pinch.mode = 'zoom' } else if (panDelta >= 8) { this.pinch.mode = 'pan' }
     }
 
-    // Continuous two-finger pan, accumulated into whole tile steps
-    const c = this.getTouchCentroid(e)
-    this.pinch.panX += (this.pinch.cx - c.x) / client.tile.w
-    this.pinch.panY += (this.pinch.cy - c.y) / client.tile.h
-    const dx = Math.trunc(this.pinch.panX)
-    const dy = Math.trunc(this.pinch.panY)
-    if (dx !== 0 || dy !== 0) {
-      client.modViewport(dx, dy)
-      this.pinch.panX -= dx
-      this.pinch.panY -= dy
+    if (this.pinch.mode === 'zoom') {
+      const delta = dist - this.pinch.dist
+      if (Math.abs(delta) >= 10) {
+        client.modZoom(delta > 0 ? 0.0625 : -0.0625)
+        this.pinch.dist = dist
+      }
+    } else if (this.pinch.mode === 'pan') {
+      // Accumulate centroid movement into whole tile steps
+      this.pinch.panX += (this.pinch.cx - c.x) / client.tile.w
+      this.pinch.panY += (this.pinch.cy - c.y) / client.tile.h
+      const dx = Math.trunc(this.pinch.panX)
+      const dy = Math.trunc(this.pinch.panY)
+      if (dx !== 0 || dy !== 0) {
+        client.modViewport(dx, dy)
+        this.pinch.panX -= dx
+        this.pinch.panY -= dy
+      }
     }
+
     this.pinch.cx = c.x
     this.pinch.cy = c.y
   }

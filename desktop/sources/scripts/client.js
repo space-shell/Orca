@@ -240,8 +240,16 @@ function Client () {
 
   this.modViewport = (dx, dy) => {
     const vt = this.getVisibleTiles()
-    this.viewport.x = clamp(this.viewport.x + dx, 0, Math.max(0, this.orca.w - vt.w))
-    this.viewport.y = clamp(this.viewport.y + dy, 0, Math.max(0, this.orca.h - vt.h))
+    const newX = Math.max(0, this.viewport.x + dx)
+    const newY = Math.max(0, this.viewport.y + dy)
+    // Expand the orca grid so the new viewport position is always reachable
+    const neededW = newX + vt.w
+    const neededH = newY + vt.h
+    if (neededW > this.orca.w || neededH > this.orca.h) {
+      this.crop(Math.max(this.orca.w, neededW), Math.max(this.orca.h, neededH))
+    }
+    this.viewport.x = newX
+    this.viewport.y = newY
     this.update()
   }
 
