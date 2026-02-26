@@ -13,6 +13,8 @@ function Cursor (client) {
 
   this.ins = false
   this.pinch = null
+  this.wheelZoomAccum = 0
+  this.wheelScrollTime = 0
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -238,10 +240,22 @@ function Cursor (client) {
 
   this.onWheel = (e) => {
     e.preventDefault()
-    // shiftKey forces horizontal; deltaX handles trackpad horizontal natively
-    const dx = e.shiftKey ? Math.sign(e.deltaY) : Math.sign(e.deltaX)
-    const dy = e.shiftKey ? 0 : Math.sign(e.deltaY)
-    client.modViewport(dx, dy)
+    if (e.ctrlKey) {
+      // Trackpad pinch: browser sets ctrlKey and puts the pinch delta in deltaY
+      this.wheelZoomAccum -= e.deltaY
+      if (Math.abs(this.wheelZoomAccum) >= 20) {
+        client.modZoom(this.wheelZoomAccum > 0 ? 0.0625 : -0.0625)
+        this.wheelZoomAccum = 0
+      }
+    } else {
+      // Scroll: throttle to prevent trackpad momentum from firing many cells at once
+      const now = performance.now()
+      if (now - this.wheelScrollTime < 80) { return }
+      this.wheelScrollTime = now
+      const dx = e.shiftKey ? Math.sign(e.deltaY) : Math.sign(e.deltaX)
+      const dy = e.shiftKey ? 0 : Math.sign(e.deltaY)
+      client.modViewport(dx, dy)
+    }
   }
 
   this.onMouseDown = (e) => {
