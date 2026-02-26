@@ -34,6 +34,7 @@ function Client () {
     h: +localStorage.getItem('tileh') || 15
   }
   this.guide = false
+  this.viewport = { x: 0, y: 0 }
 
   this.el = document.createElement('canvas')
   this.context = this.el.getContext('2d')
@@ -145,6 +146,7 @@ function Client () {
 
   this.reset = () => {
     this.orca.reset()
+    this.viewport = { x: 0, y: 0 }
     this.resize()
     this.source.new()
     this.history.reset()
@@ -178,6 +180,7 @@ function Client () {
     this.orca.load(w, h, s)
     this.history.reset()
     this.history.record(this.orca.s)
+    this.viewport = { x: 0, y: 0 }
     this.resize()
   }
 
@@ -225,6 +228,21 @@ function Client () {
     }
     saveZoom()
     this.resize(true)
+  }
+
+  this.getVisibleTiles = () => {
+    const pad = 30
+    return {
+      w: Math.ceil((window.innerWidth - (pad * 2)) / this.tile.w),
+      h: Math.ceil((window.innerHeight - ((pad * 2) + this.tile.h * 2)) / this.tile.h)
+    }
+  }
+
+  this.modViewport = (dx, dy) => {
+    const vt = this.getVisibleTiles()
+    this.viewport.x = clamp(this.viewport.x + dx, 0, Math.max(0, this.orca.w - vt.w))
+    this.viewport.y = clamp(this.viewport.y + dy, 0, Math.max(0, this.orca.h - vt.h))
+    this.update()
   }
 
   //
@@ -301,16 +319,22 @@ function Client () {
 
   this.drawProgram = () => {
     const selection = this.cursor.read()
-    for (let y = 0; y < this.orca.h; y++) {
-      for (let x = 0; x < this.orca.w; x++) {
+    const vt = this.getVisibleTiles()
+    const maxY = Math.min(this.viewport.y + vt.h, this.orca.h)
+    const maxX = Math.min(this.viewport.x + vt.w, this.orca.w)
+    for (let gy = this.viewport.y; gy < maxY; gy++) {
+      for (let gx = this.viewport.x; gx < maxX; gx++) {
+        // gy/gx are orca (absolute) coords; sx/sy are screen coords
+        const sx = gx - this.viewport.x
+        const sy = gy - this.viewport.y
         // Handle blanks
-        if (this.isInvisible(x, y)) { continue }
+        if (this.isInvisible(gx, gy)) { continue }
         // Make Glyph
-        const g = this.orca.glyphAt(x, y)
+        const g = this.orca.glyphAt(gx, gy)
         // Get glyph
-        const glyph = g !== '.' ? g : this.isCursor(x, y) ? (this.clock.isPaused ? '~' : '@') : this.isMarker(x, y) ? '+' : g
+        const glyph = g !== '.' ? g : this.isCursor(gx, gy) ? (this.clock.isPaused ? '~' : '@') : this.isMarker(gx, gy) ? '+' : g
         // Make Style
-        this.drawSprite(x, y, glyph, this.makeStyle(x, y, glyph, selection))
+        this.drawSprite(sx, sy, glyph, this.makeStyle(gx, gy, glyph, selection))
       }
     }
   }
@@ -327,33 +351,34 @@ function Client () {
   }
 
   this.drawInterface = () => {
-    this.write(`${this.cursor.inspect()}`, this.grid.w * 0, this.orca.h, this.grid.w - 1)
-    this.write(`${this.cursor.x},${this.cursor.y}${this.cursor.ins ? '+' : ''}`, this.grid.w * 1, this.orca.h, this.grid.w, this.cursor.ins ? 1 : 2)
-    this.write(`${this.cursor.w}:${this.cursor.h}`, this.grid.w * 2, this.orca.h, this.grid.w)
-    this.write(`${this.orca.f}f${this.clock.isPaused ? '~' : ''}`, this.grid.w * 3, this.orca.h, this.grid.w)
-    this.write(`${this.io.inspect(this.grid.w)}`, this.grid.w * 4, this.orca.h, this.grid.w - 1)
-    this.write(this.orca.f < 250 ? `< ${this.io.midi.toInputString()}` : '', this.grid.w * 5, this.orca.h, this.grid.w * 4)
+    const vh = this.getVisibleTiles().h
+    this.write(`${this.cursor.inspect()}`, this.grid.w * 0, vh, this.grid.w - 1)
+    this.write(`${this.cursor.x},${this.cursor.y}${this.cursor.ins ? '+' : ''}`, this.grid.w * 1, vh, this.grid.w, this.cursor.ins ? 1 : 2)
+    this.write(`${this.cursor.w}:${this.cursor.h}`, this.grid.w * 2, vh, this.grid.w)
+    this.write(`${this.orca.f}f${this.clock.isPaused ? '~' : ''}`, this.grid.w * 3, vh, this.grid.w)
+    this.write(`${this.io.inspect(this.grid.w)}`, this.grid.w * 4, vh, this.grid.w - 1)
+    this.write(this.orca.f < 250 ? `< ${this.io.midi.toInputString()}` : '', this.grid.w * 5, vh, this.grid.w * 4)
 
     if (this.commander.isActive === true) {
-      this.write(`${this.commander.query}${this.orca.f % 2 === 0 ? '_' : ''}`, this.grid.w * 0, this.orca.h + 1, this.grid.w * 4)
+      this.write(`${this.commander.query}${this.orca.f % 2 === 0 ? '_' : ''}`, this.grid.w * 0, vh + 1, this.grid.w * 4)
     } else {
-      this.write(this.orca.f < 25 ? `ver${this.version}` : `${Object.keys(this.source.cache).length} mods`, this.grid.w * 0, this.orca.h + 1, this.grid.w)
-      this.write(`${this.orca.w}x${this.orca.h}`, this.grid.w * 1, this.orca.h + 1, this.grid.w)
-      this.write(`${this.grid.w}/${this.grid.h}${this.tile.w !== 10 ? ' ' + (this.tile.w / 10).toFixed(1) : ''}`, this.grid.w * 2, this.orca.h + 1, this.grid.w)
-      this.write(`${this.clock}`, this.grid.w * 3, this.orca.h + 1, this.grid.w, this.clock.isPuppet ? 3 : this.io.midi.isClock ? 11 : this.clock.isPaused ? 20 : 2)
-      this.write(`${display(Object.keys(this.orca.variables).join(''), this.orca.f, this.grid.w - 1)}`, this.grid.w * 4, this.orca.h + 1, this.grid.w - 1)
-      this.write(this.orca.f < 250 ? `> ${this.io.midi.toOutputString()}` : '', this.grid.w * 5, this.orca.h + 1, this.grid.w * 4)
+      this.write(this.orca.f < 25 ? `ver${this.version}` : `${Object.keys(this.source.cache).length} mods`, this.grid.w * 0, vh + 1, this.grid.w)
+      this.write(`${this.orca.w}x${this.orca.h}`, this.grid.w * 1, vh + 1, this.grid.w)
+      this.write(`${this.grid.w}/${this.grid.h}${this.tile.w !== 10 ? ' ' + (this.tile.w / 10).toFixed(1) : ''}`, this.grid.w * 2, vh + 1, this.grid.w)
+      this.write(`${this.clock}`, this.grid.w * 3, vh + 1, this.grid.w, this.clock.isPuppet ? 3 : this.io.midi.isClock ? 11 : this.clock.isPaused ? 20 : 2)
+      this.write(`${display(Object.keys(this.orca.variables).join(''), this.orca.f, this.grid.w - 1)}`, this.grid.w * 4, vh + 1, this.grid.w - 1)
+      this.write(this.orca.f < 250 ? `> ${this.io.midi.toOutputString()}` : '', this.grid.w * 5, vh + 1, this.grid.w * 4)
     }
   }
 
   this.drawGuide = () => {
     if (this.guide !== true) { return }
     const operators = Object.keys(this.library).filter((val) => { return isNaN(val) })
+    const frame = this.getVisibleTiles().h - 4
     for (const id in operators) {
       const key = operators[id]
       const oper = new this.library[key]()
       const text = oper.info
-      const frame = this.orca.h - 4
       const x = (Math.floor(parseInt(id) / frame) * 32) + 2
       const y = (parseInt(id) % frame) + 2
       this.write(key, x, y, 99, 3)
@@ -382,32 +407,36 @@ function Client () {
   // Resize tools
 
   this.resize = () => {
-    const pad = 30
-    const size = { w: window.innerWidth - (pad * 2), h: window.innerHeight - ((pad * 2) + this.tile.h * 2) }
-    const tiles = { w: Math.ceil(size.w / this.tile.w), h: Math.ceil(size.h / this.tile.h) }
+    const vt = this.getVisibleTiles()
     const bounds = this.orca.bounds()
 
-    // Clamp at limits of orca file
-    if (tiles.w < bounds.w + 1) { tiles.w = bounds.w + 1 }
-    if (tiles.h < bounds.h + 1) { tiles.h = bounds.h + 1 }
+    // Expand orca grid to fit visible area and content — never shrink it
+    const targetW = Math.max(vt.w, bounds.w + 1, this.orca.w)
+    const targetH = Math.max(vt.h, bounds.h + 1, this.orca.h)
+    if (targetW !== this.orca.w || targetH !== this.orca.h) {
+      this.crop(targetW, targetH)
+    }
 
-    this.crop(tiles.w, tiles.h)
+    // Clamp viewport so it never scrolls past the orca grid
+    this.viewport.x = clamp(this.viewport.x, 0, Math.max(0, this.orca.w - vt.w))
+    this.viewport.y = clamp(this.viewport.y, 0, Math.max(0, this.orca.h - vt.h))
 
-    // Keep cursor in bounds
-    if (this.cursor.x >= tiles.w) { this.cursor.moveTo(tiles.w - 1, this.cursor.y) }
-    if (this.cursor.y >= tiles.h) { this.cursor.moveTo(this.cursor.x, tiles.h - 1) }
+    // Keep cursor within orca grid bounds
+    if (this.cursor.x >= this.orca.w) { this.cursor.moveTo(this.orca.w - 1, this.cursor.y) }
+    if (this.cursor.y >= this.orca.h) { this.cursor.moveTo(this.cursor.x, this.orca.h - 1) }
 
-    const w = this.tile.ws * this.orca.w
-    const h = (this.tile.hs + (this.tile.hs / 5)) * this.orca.h
+    // Canvas is sized to the visible area, not the full orca grid
+    const w = this.tile.ws * vt.w
+    const h = (this.tile.hs + (this.tile.hs / 5)) * vt.h
 
     if (w === this.el.width && h === this.el.height) { return }
 
-    console.log(`Resized to: ${this.orca.w}x${this.orca.h}`)
+    console.log(`Viewport: ${vt.w}x${vt.h}, orca: ${this.orca.w}x${this.orca.h}`)
 
     this.el.width = w
     this.el.height = h
-    this.el.style.width = `${Math.ceil(this.tile.w * this.orca.w)}px`
-    this.el.style.height = `${Math.ceil((this.tile.h + (this.tile.h / 5)) * this.orca.h)}px`
+    this.el.style.width = `${Math.ceil(this.tile.w * vt.w)}px`
+    this.el.style.height = `${Math.ceil((this.tile.h + (this.tile.h / 5)) * vt.h)}px`
 
     this.context.textBaseline = 'bottom'
     this.context.textAlign = 'center'

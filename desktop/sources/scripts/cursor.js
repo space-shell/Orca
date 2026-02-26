@@ -28,6 +28,7 @@ function Cursor (client) {
     document.addEventListener('touchmove', this.onTouchMove, { passive: false })
     document.addEventListener('touchend', this.onTouchEnd, { passive: false })
     document.addEventListener('touchcancel', this.onTouchEnd, { passive: false })
+    document.addEventListener('wheel', this.onWheel, { passive: false })
   }
 
   this.select = (x = this.x, y = this.y, w = this.w, h = this.h) => {
@@ -175,19 +176,36 @@ function Cursor (client) {
   this.onTouchStart = (e) => {
     if (e.touches.length === 2) {
       e.preventDefault()
-      this.pinch = { dist: this.getTouchDist(e) }
+      const c = this.getTouchCentroid(e)
+      this.pinch = { dist: this.getTouchDist(e), cx: c.x, cy: c.y, panX: 0, panY: 0 }
     }
   }
 
   this.onTouchMove = (e) => {
     if (e.touches.length !== 2 || !this.pinch) { return }
     e.preventDefault()
+
+    // Stepped pinch-to-zoom
     const dist = this.getTouchDist(e)
-    const delta = dist - this.pinch.dist
-    if (Math.abs(delta) >= 10) {
-      client.modZoom(delta > 0 ? 0.0625 : -0.0625)
+    const distDelta = dist - this.pinch.dist
+    if (Math.abs(distDelta) >= 10) {
+      client.modZoom(distDelta > 0 ? 0.0625 : -0.0625)
       this.pinch.dist = dist
     }
+
+    // Continuous two-finger pan, accumulated into whole tile steps
+    const c = this.getTouchCentroid(e)
+    this.pinch.panX += (this.pinch.cx - c.x) / client.tile.w
+    this.pinch.panY += (this.pinch.cy - c.y) / client.tile.h
+    const dx = Math.trunc(this.pinch.panX)
+    const dy = Math.trunc(this.pinch.panY)
+    if (dx !== 0 || dy !== 0) {
+      client.modViewport(dx, dy)
+      this.pinch.panX -= dx
+      this.pinch.panY -= dy
+    }
+    this.pinch.cx = c.x
+    this.pinch.cy = c.y
   }
 
   this.onTouchEnd = (e) => {
@@ -198,6 +216,21 @@ function Cursor (client) {
     const dx = e.touches[0].clientX - e.touches[1].clientX
     const dy = e.touches[0].clientY - e.touches[1].clientY
     return Math.hypot(dx, dy)
+  }
+
+  this.getTouchCentroid = (e) => {
+    return {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    }
+  }
+
+  this.onWheel = (e) => {
+    e.preventDefault()
+    // shiftKey forces horizontal; deltaX handles trackpad horizontal natively
+    const dx = e.shiftKey ? Math.sign(e.deltaY) : Math.sign(e.deltaX)
+    const dy = e.shiftKey ? 0 : Math.sign(e.deltaY)
+    client.modViewport(dx, dy)
   }
 
   this.onMouseDown = (e) => {
@@ -222,7 +255,10 @@ function Cursor (client) {
   }
 
   this.mousePick = (x, y, w = client.tile.w, h = client.tile.h) => {
-    return { x: parseInt((x - 30) / w), y: parseInt((y - 30) / h) }
+    return {
+      x: parseInt((x - 30) / w) + client.viewport.x,
+      y: parseInt((y - 30) / h) + client.viewport.y
+    }
   }
 
   this.onContextMenu = (e) => {
