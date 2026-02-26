@@ -183,8 +183,11 @@ function Cursor (client) {
     if (e.touches.length !== 2 || !this.pinch) { return }
     e.preventDefault()
     const dist = this.getTouchDist(e)
-    client.modZoom((dist / this.pinch.dist) - 1)
-    this.pinch.dist = dist
+    const delta = dist - this.pinch.dist
+    if (Math.abs(delta) >= 10) {
+      client.modZoom(delta > 0 ? 0.0625 : -0.0625)
+      this.pinch.dist = dist
+    }
   }
 
   this.onTouchEnd = (e) => {

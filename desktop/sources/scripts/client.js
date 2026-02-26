@@ -207,6 +207,15 @@ function Client () {
     this.setGrid(w, h)
   }
 
+  let saveZoomTimer = null
+  const saveZoom = () => {
+    clearTimeout(saveZoomTimer)
+    saveZoomTimer = setTimeout(() => {
+      localStorage.setItem('tilew', this.tile.w)
+      localStorage.setItem('tileh', this.tile.h)
+    }, 300)
+  }
+
   this.modZoom = (mod = 0, reset = false) => {
     this.tile = {
       w: reset ? 10 : this.tile.w * (mod + 1),
@@ -214,8 +223,7 @@ function Client () {
       ws: Math.floor(this.tile.w * this.scale),
       hs: Math.floor(this.tile.h * this.scale)
     }
-    localStorage.setItem('tilew', this.tile.w)
-    localStorage.setItem('tileh', this.tile.h)
+    saveZoom()
     this.resize(true)
   }
 
