@@ -43,13 +43,30 @@ Orca is an esoteric programming language / livecoding environment. The grid is a
 
 ### Application Layer (`desktop/sources/scripts/`)
 
-- **`client.js`** — The central `Client` class: owns all subsystems (`orca`, `io`, `cursor`, `commander`, `clock`, `theme`, `acels`, `source`, `history`), handles the canvas rendering loop, and wires up all keyboard shortcuts. The main loop is `client.run()` → `clock.run()` → `orca.run()` → `io.run()` → `client.update()`.
+- **`client.js`** — The central `Client` class: owns all subsystems (`orca`, `io`, `cursor`, `commander`, `clock`, `theme`, `acels`, `source`, `history`), handles the canvas rendering loop, and wires up all keyboard shortcuts. The main loop is `client.run()` → `clock.run()` → `orca.run()` → `io.run()` → `client.update()`. Also owns viewport state and zoom/scroll helpers (see Touch & Scroll below).
 
 - **`clock.js`** — Drives the frame loop (BPM-based), supports MIDI clock sync.
 
-- **`cursor.js`** — Selection and editing state on the grid.
+- **`cursor.js`** — Selection and editing state on the grid. Also owns all pointer input handlers: mouse, scroll wheel, and touch gestures (see Touch & Scroll below).
 
 - **`commander.js`** — In-app command-line prompt (`CmdOrCtrl+K`). Commands like `bpm:140`, `inject:file`, `osc:7777`. All commands have a 2-character shorthand.
+
+### Touch & Scroll
+
+All pointer input beyond basic mouse clicks lives in `cursor.js` and `client.js`.
+
+**Viewport (`client.js`)**
+- `this.viewport = { x, y }` — scroll offset in grid cells, reset to `{0,0}` on file open/reset.
+- `getVisibleTiles()` — derives `{ w, h }` tile count from window and tile size; used by `resize()`, `drawProgram()`, `drawInterface()`, and `drawGuide()` so the canvas is always sized to the visible area rather than the full orca grid.
+- `modViewport(dx, dy)` — shifts the viewport, expanding the orca grid via `crop()` if scrolling into empty space. The orca grid only ever grows, never shrinks, so off-screen content is preserved.
+- `modZoom()` — saves tile size to `localStorage` via a 300ms debounce to avoid excessive writes during rapid zoom.
+
+**`cursor.js` gesture handlers**
+- `mousePick()` adds `client.viewport.x/y` so clicks land on the correct orca cell after scrolling.
+- **Pinch-to-zoom (touch)**: `onTouchStart` records initial distance + centroid. `onTouchMove` locks into `'zoom'` or `'pan'` mode on the first significant movement (≥10px distance change → zoom, ≥8px centroid travel → pan) and ignores the other axis for the rest of the gesture. Zoom fires a `±6.25%` step per 10px of pinch distance change.
+- **Two-finger pan (touch)**: centroid delta is accumulated in sub-tile units; `modViewport()` is called once a full tile boundary is crossed, with the remainder carried forward.
+- **Scroll wheel / trackpad scroll**: `onWheel` throttled to one cell per 80ms to prevent momentum over-scroll. `Shift+scroll` or trackpad `deltaX` scrolls horizontally.
+- **Trackpad pinch**: browsers set `e.ctrlKey = true` on wheel events that originate from a trackpad pinch, with the pinch magnitude in `deltaY`. `onWheel` accumulates this and fires a `±6.25%` zoom step each time the accumulator crosses `±20`.
 
 ### Electron Entry Point
 
