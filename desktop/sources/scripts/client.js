@@ -129,6 +129,14 @@ function Client () {
   this.start = () => {
     console.info('Client', 'Starting..')
     console.info(`${this.acels}`)
+    console.info('Touch', [
+      'tap          — place cursor',
+      'drag         — select region  →  copy / paste / erase row appears below',
+      'double-tap   — open glyph keyboard (zooms in; restores on close)',
+      'long-press   — open glyph keyboard (no zoom)',
+      'pinch        — zoom',
+      'two-finger   — pan viewport'
+    ].join('\n       '))
     this.theme.start()
     this.io.start()
     this.history.bind(this.orca, 's')
