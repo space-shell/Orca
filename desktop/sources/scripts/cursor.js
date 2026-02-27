@@ -338,7 +338,7 @@ function Cursor (client) {
   }
 
   this.openInlineKeyboard = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789*#:%!?;=$'
+    const chars = '0123456789abcdefghijklmnopqrstuvwxyz*#:%!?;=$^~'
     const W = 8; const H = 6
     let ox = clamp(this.x - 4, 0, Math.max(0, client.orca.w - W))
     let oy = clamp(this.y - 2, 0, Math.max(0, client.orca.h - H))
@@ -351,7 +351,7 @@ function Cursor (client) {
         if (ci < chars.length) { cells.push({ gx, gy, char: chars[ci++] }) }
       }
     }
-    this.inlineKeyboard = { cells }
+    this.inlineKeyboard = { cells, shifted: false }
     client.update()
   }
 
@@ -362,8 +362,19 @@ function Cursor (client) {
   }
 
   this.commitKey = (char) => {
+    if (char === '^') {
+      this.inlineKeyboard.shifted = !this.inlineKeyboard.shifted
+      client.update()
+      return
+    }
+    const shifted = this.inlineKeyboard.shifted
     this.inlineKeyboard = null
-    this.write(char)
+    if (char === '~') {
+      client.orca.write(this.x, this.y, '.')
+      client.history.record(client.orca.s)
+    } else {
+      this.write(shifted && /^[a-z]$/.test(char) ? char.toUpperCase() : char)
+    }
     client.update()
   }
 

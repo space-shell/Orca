@@ -363,7 +363,9 @@ function Client () {
       const sx = gx - this.viewport.x
       const sy = gy - this.viewport.y
       if (sx < 0 || sx >= vt.w || sy < 0 || sy >= vt.h) { continue }
-      this.drawSprite(sx, sy, char, 12)
+      const isShiftKey = char === '^'
+      const displayChar = (!isShiftKey && kb.shifted && /^[a-z]$/.test(char)) ? char.toUpperCase() : char
+      this.drawSprite(sx, sy, displayChar, isShiftKey && kb.shifted ? 4 : 12)
     }
   }
 
