@@ -14,13 +14,6 @@ function Picker (client) {
   ]
 
   this.install = (host) => {
-    // Floating trigger button
-    const btn = document.createElement('button')
-    btn.id = 'picker-btn'
-    btn.textContent = 'kbd'
-    btn.addEventListener('click', () => { this.toggle() })
-    host.appendChild(btn)
-
     // Main picker panel
     this.el = document.createElement('div')
     this.el.id = 'picker'
@@ -113,9 +106,7 @@ function Picker (client) {
 
     // Close on outside tap/click
     document.addEventListener('click', (e) => {
-      if (this.isVisible && !this.el.contains(e.target) && e.target.id !== 'picker-btn') {
-        this.close()
-      }
+      if (this.isVisible && !this.el.contains(e.target)) { this.close() }
     })
 
     host.appendChild(this.el)

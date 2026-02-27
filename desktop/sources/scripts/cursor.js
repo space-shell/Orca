@@ -15,6 +15,8 @@ function Cursor (client) {
   this.pinch = null
   this.touchFrom = null
   this.longPressTimer = null
+  this.lastTap = null
+  this.lastTapTimer = null
   this.wheelZoomAccum = 0
   this.wheelScrollAccum = { x: 0, y: 0 }
 
@@ -178,6 +180,7 @@ function Cursor (client) {
   this.mouseFrom = null
 
   this.onTouchStart = (e) => {
+    if (e.target.closest && e.target.closest('#picker')) { return }
     if (e.touches.length === 2) {
       e.preventDefault()
       clearTimeout(this.longPressTimer)
@@ -252,14 +255,30 @@ function Cursor (client) {
   this.onTouchEnd = (e) => {
     clearTimeout(this.longPressTimer)
     this.longPressTimer = null
+    if (e.target.closest && e.target.closest('#picker')) { this.touchFrom = null; return }
     if (e.touches.length < 2) { this.pinch = null }
     if (e.touches.length === 0 && this.touchFrom) {
       const t = e.changedTouches[0]
       const dx = t.clientX - this.touchFrom.startX
       const dy = t.clientY - this.touchFrom.startY
       if (Math.hypot(dx, dy) < 8) {
-        // Tap: place cursor at touch position
-        this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0)
+        // Check for double-tap (40px tolerance for small cells)
+        const now = Date.now()
+        if (this.lastTap && (now - this.lastTap.time) < 300 && Math.hypot(t.clientX - this.lastTap.x, t.clientY - this.lastTap.y) < 40) {
+          clearTimeout(this.lastTapTimer)
+          this.lastTap = null
+          client.picker.open()
+        } else {
+          // Single tap: place cursor, open double-tap window
+          this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0)
+          clearTimeout(this.lastTapTimer)
+          this.lastTap = { time: now, x: t.clientX, y: t.clientY }
+          this.lastTapTimer = setTimeout(() => { this.lastTap = null }, 300)
+        }
+      } else {
+        // Drag ended: cancel any pending double-tap
+        clearTimeout(this.lastTapTimer)
+        this.lastTap = null
       }
       this.touchFrom = null
     }
