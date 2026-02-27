@@ -10,6 +10,7 @@
 /* global Commander */
 /* global Clock */
 /* global Theme */
+/* global Picker */
 
 function Client () {
   this.version = 178
@@ -25,6 +26,7 @@ function Client () {
   this.cursor = new Cursor(this)
   this.commander = new Commander(this)
   this.clock = new Clock(this)
+  this.picker = new Picker(this)
 
   // Settings
   this.scale = window.devicePixelRatio
@@ -42,6 +44,7 @@ function Client () {
   this.install = (host) => {
     host.appendChild(this.el)
     this.theme.install(host)
+    this.picker.install(host)
 
     this.theme.default = { background: '#000000', f_high: '#ffffff', f_med: '#777777', f_low: '#444444', f_inv: '#000000', b_high: '#eeeeee', b_med: '#72dec2', b_low: '#444444', b_inv: '#ffb545' }
 

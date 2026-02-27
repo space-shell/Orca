@@ -14,6 +14,7 @@ function Cursor (client) {
   this.ins = false
   this.pinch = null
   this.touchFrom = null
+  this.longPressTimer = null
   this.wheelZoomAccum = 0
   this.wheelScrollAccum = { x: 0, y: 0 }
 
@@ -179,6 +180,8 @@ function Cursor (client) {
   this.onTouchStart = (e) => {
     if (e.touches.length === 2) {
       e.preventDefault()
+      clearTimeout(this.longPressTimer)
+      this.longPressTimer = null
       const c = this.getTouchCentroid(e)
       // mode: null = undecided, 'zoom', 'pan'
       this.pinch = { dist: this.getTouchDist(e), cx: c.x, cy: c.y, panX: 0, panY: 0, mode: null }
@@ -188,6 +191,11 @@ function Cursor (client) {
       const t = e.touches[0]
       const pos = this.mousePick(t.clientX, t.clientY)
       this.touchFrom = { startX: t.clientX, startY: t.clientY, pos }
+      this.longPressTimer = setTimeout(() => {
+        this.longPressTimer = null
+        this.touchFrom = null
+        client.picker.open()
+      }, 500)
     }
   }
 
@@ -195,6 +203,12 @@ function Cursor (client) {
     if (e.touches.length === 1 && this.touchFrom) {
       e.preventDefault()
       const t = e.touches[0]
+      const dx = t.clientX - this.touchFrom.startX
+      const dy = t.clientY - this.touchFrom.startY
+      if (this.longPressTimer && Math.hypot(dx, dy) >= 8) {
+        clearTimeout(this.longPressTimer)
+        this.longPressTimer = null
+      }
       const pos = this.mousePick(t.clientX, t.clientY)
       this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, pos.x - this.touchFrom.pos.x, pos.y - this.touchFrom.pos.y)
       return
@@ -236,6 +250,8 @@ function Cursor (client) {
   }
 
   this.onTouchEnd = (e) => {
+    clearTimeout(this.longPressTimer)
+    this.longPressTimer = null
     if (e.touches.length < 2) { this.pinch = null }
     if (e.touches.length === 0 && this.touchFrom) {
       const t = e.changedTouches[0]
