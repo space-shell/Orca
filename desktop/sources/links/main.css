@@ -17,20 +17,22 @@ canvas.ready { opacity: 1; }
 body { background-color:var(--background) !important; }
 /* Picker */
 
-#picker-btn { position: fixed; top: 8px; right: 8px; width: 44px; height: 44px; background: var(--b_med); color: var(--f_high); border: none; border-radius: 4px; font-size: 20px; cursor: pointer; z-index: 100; -webkit-app-region: no-drag; display: flex; align-items: center; justify-content: center; }
-#picker-btn:active { background: var(--b_inv); color: var(--f_inv); }
-#picker { position: fixed; bottom: 0; left: 0; right: 0; background: var(--background); border-top: 2px solid var(--b_med); transform: translateY(100%); transition: transform 200ms ease-out; z-index: 99; -webkit-app-region: no-drag; padding-bottom: env(safe-area-inset-bottom, 0); max-height: 60vh; overflow-y: auto; }
+#picker-btn { position: fixed; bottom: 8px; left: 8px; background: var(--background); color: var(--f_med); border: 1px solid var(--b_med); font-family: 'input_mono_medium'; font-size: 11px; line-height: 1; padding: 6px 10px; cursor: pointer; z-index: 100; -webkit-app-region: no-drag; }
+#picker-btn:active { background: var(--b_inv); color: var(--f_inv); border-color: var(--b_inv); }
+#picker { position: fixed; bottom: 0; left: 0; right: 0; background: var(--background); border-top: 1px solid var(--b_med); transform: translateY(100%); transition: transform 150ms ease-out; z-index: 99; -webkit-app-region: no-drag; padding-bottom: env(safe-area-inset-bottom, 0); max-height: 60vh; overflow-y: auto; }
 #picker.visible { transform: translateY(0); }
-.picker-tabs { display: flex; border-bottom: 1px solid var(--b_med); }
-.picker-tab { flex: 1; height: 44px; background: none; border: none; color: var(--f_med); font-family: 'input_mono_medium'; font-size: 12px; cursor: pointer; }
-.picker-tab.active { background: var(--b_inv); color: var(--f_inv); }
-.picker-panel { padding: 8px; }
-.picker-glyphs { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
-.picker-glyph { min-height: 44px; background: var(--b_low); color: var(--f_high); border: none; font-family: 'input_mono_medium'; font-size: 14px; cursor: pointer; border-radius: 2px; text-transform: none; }
+.picker-tabs { display: flex; background: var(--b_med); gap: 1px; }
+.picker-tab { flex: 1; height: 32px; background: var(--background); border: none; color: var(--f_med); font-family: 'input_mono_medium'; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+.picker-tab.active { color: var(--b_med); }
+.picker-panel { padding: 0; background: var(--background); }
+.picker-glyph-filler { background: var(--background); }
+.picker-glyphs { display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; }
+.picker-glyph { min-height: 44px; background: var(--background); color: var(--f_high); border: none; font-family: 'input_mono_medium'; font-size: 13px; cursor: pointer; }
 .picker-glyph:active, .picker-glyph.active { background: var(--b_inv); color: var(--f_inv); }
-.picker-shift-btn { display: block; width: 100%; margin-top: 4px; min-height: 44px; background: var(--b_low); color: var(--f_med); border: none; font-family: 'input_mono_medium'; font-size: 12px; cursor: pointer; border-radius: 2px; }
-.picker-shift-btn.active { background: var(--b_med); color: var(--f_high); }
-.picker-action-row { display: flex; gap: 4px; margin-bottom: 4px; align-items: center; }
-.picker-action-btn { flex: 1; min-height: 44px; background: var(--b_low); color: var(--f_high); border: none; font-family: 'input_mono_medium'; font-size: 12px; cursor: pointer; border-radius: 2px; }
+.picker-shift-btn { display: block; width: 100%; min-height: 32px; background: var(--background); color: var(--f_low); border: none; font-family: 'input_mono_medium'; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
+.picker-shift-btn.active { color: var(--b_med); }
+.picker-action-row { display: flex; gap: 1px; background: var(--b_med); }
+.picker-action-row + .picker-action-row { margin-top: 1px; }
+.picker-action-btn { flex: 1; min-height: 40px; background: var(--background); color: var(--f_high); border: none; font-family: 'input_mono_medium'; font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; }
 .picker-action-btn:active { background: var(--b_inv); color: var(--f_inv); }
-.picker-bpm-label { flex: 1; text-align: center; color: var(--f_med); font-family: 'input_mono_medium'; font-size: 12px; white-space: nowrap; }
+.picker-bpm-label { flex: 1; text-align: center; color: var(--f_med); font-family: 'input_mono_medium'; font-size: 11px; white-space: nowrap; display: flex; align-items: center; justify-content: center; background: var(--background); }

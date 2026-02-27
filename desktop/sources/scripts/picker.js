@@ -17,7 +17,7 @@ function Picker (client) {
     // Floating trigger button
     const btn = document.createElement('button')
     btn.id = 'picker-btn'
-    btn.textContent = '⌨'
+    btn.textContent = 'kbd'
     btn.addEventListener('click', () => { this.toggle() })
     host.appendChild(btn)
 
@@ -131,6 +131,15 @@ function Picker (client) {
         client.cursor.write(this.shift ? g.toUpperCase() : g)
       })
       container.appendChild(btn)
+    }
+    // Fill remainder of last row so teal grid background doesn't bleed through
+    const rem = glyphs.length % 10
+    if (rem !== 0) {
+      for (let i = rem; i < 10; i++) {
+        const filler = document.createElement('div')
+        filler.className = 'picker-glyph-filler'
+        container.appendChild(filler)
+      }
     }
   }
 
