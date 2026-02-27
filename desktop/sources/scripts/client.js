@@ -177,6 +177,7 @@ function Client () {
     this.drawProgram()
     this.drawSelectionActions()
     this.drawInlineKeyboard()
+    this.drawScrubber()
     this.drawInterface()
     this.drawGuide()
   }
@@ -371,6 +372,22 @@ function Client () {
       const isShiftKey = char === '^'
       const displayChar = (!isShiftKey && kb.shifted && /^[a-z]$/.test(char)) ? char.toUpperCase() : char
       this.drawSprite(sx, sy, displayChar, isShiftKey && kb.shifted ? 4 : 12)
+    }
+  }
+
+  this.drawScrubber = () => {
+    const sc = this.cursor.scrubber
+    if (!sc) { return }
+    const vt = this.getVisibleTiles()
+    for (const { gx, gy, char } of sc.arrows) {
+      const sx = gx - this.viewport.x; const sy = gy - this.viewport.y
+      if (sx >= 0 && sx < vt.w && sy >= 0 && sy < vt.h) {
+        this.drawSprite(sx, sy, char, 12)
+      }
+    }
+    const sx = sc.x - this.viewport.x; const sy = sc.y - this.viewport.y
+    if (sx >= 0 && sx < vt.w && sy >= 0 && sy < vt.h) {
+      this.drawSprite(sx, sy, this.orca.keyOf(sc.currentVal), 4)
     }
   }
 

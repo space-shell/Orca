@@ -21,6 +21,7 @@ function Cursor (client) {
   this.wheelScrollAccum = { x: 0, y: 0 }
   this.clipboard = null
   this.inlineKeyboard = null
+  this.scrubber = null
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -197,14 +198,32 @@ function Cursor (client) {
       this.touchFrom = { startX: t.clientX, startY: t.clientY, pos }
       this.longPressTimer = setTimeout(() => {
         this.longPressTimer = null
-        if (this.touchFrom) { this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0) }
+        if (!this.touchFrom) { return }
+        if (this.inlineKeyboard) { this.closeInlineKeyboard(); this.touchFrom = null; return }
+        const pos = this.touchFrom.pos
+        const startX = this.touchFrom.startX
+        const startY = this.touchFrom.startY
         this.touchFrom = null
-        this.openInlineKeyboard()
+        const glyph = client.orca.glyphAt(pos.x, pos.y)
+        if (!/^[0-9a-z]$/.test(glyph)) { return }
+        this.select(pos.x, pos.y, 0, 0)
+        this.openScrubber(pos.x, pos.y, startX, startY, client.orca.valueOf(glyph))
       }, 500)
     }
   }
 
   this.onTouchMove = (e) => {
+    if (e.touches.length === 1 && this.scrubber) {
+      e.preventDefault()
+      const t = e.touches[0]
+      const dx = t.clientX - this.scrubber.startX
+      const dy = t.clientY - this.scrubber.startY
+      const proj = (dx - dy) / Math.SQRT2
+      const maxDist = Math.min(window.innerWidth, window.innerHeight) * 0.8
+      this.scrubber.currentVal = clamp(this.scrubber.startVal + Math.round((proj / maxDist) * 35), 0, 35)
+      client.update()
+      return
+    }
     if (e.touches.length === 1 && this.touchFrom) {
       e.preventDefault()
       const t = e.touches[0]
@@ -259,6 +278,13 @@ function Cursor (client) {
     clearTimeout(this.longPressTimer)
     this.longPressTimer = null
     if (e.touches.length < 2) { this.pinch = null }
+    if (e.touches.length === 0 && this.scrubber) {
+      client.orca.write(this.scrubber.x, this.scrubber.y, client.orca.keyOf(this.scrubber.currentVal))
+      client.history.record(client.orca.s)
+      this.scrubber = null
+      client.update()
+      return
+    }
     if (e.touches.length === 0 && this.touchFrom) {
       const t = e.changedTouches[0]
       const dx = t.clientX - this.touchFrom.startX
@@ -403,6 +429,19 @@ function Cursor (client) {
     } else {
       client.update()
     }
+  }
+
+  this.openScrubber = (x, y, startX, startY, startVal) => {
+    const arrows = []
+    const dirs = [[0, -1, '^'], [1, 0, '>'], [0, 1, 'v'], [-1, 0, '<']]
+    for (const [adx, ady, char] of dirs) {
+      const gx = x + adx; const gy = y + ady
+      if (gx >= 0 && gx < client.orca.w && gy >= 0 && gy < client.orca.h) {
+        arrows.push({ gx, gy, char })
+      }
+    }
+    this.scrubber = { x, y, startX, startY, startVal, currentVal: startVal, arrows }
+    client.update()
   }
 
   this.actionAt = (x, y) => {
