@@ -256,6 +256,14 @@ function Cursor (client) {
     clearTimeout(this.longPressTimer)
     this.longPressTimer = null
     if (e.target.closest && e.target.closest('#picker')) { this.touchFrom = null; return }
+    // Close picker on outside tap; clear double-tap state so this tap doesn't reopen it
+    if (client.picker.isVisible) {
+      client.picker.close()
+      clearTimeout(this.lastTapTimer)
+      this.lastTap = null
+      this.touchFrom = null
+      return
+    }
     if (e.touches.length < 2) { this.pinch = null }
     if (e.touches.length === 0 && this.touchFrom) {
       const t = e.changedTouches[0]
