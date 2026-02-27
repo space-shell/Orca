@@ -20,6 +20,7 @@ function Cursor (client) {
   this.wheelZoomAccum = 0
   this.wheelScrollAccum = { x: 0, y: 0 }
   this.clipboard = null
+  this.inlineKeyboard = null
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -181,7 +182,6 @@ function Cursor (client) {
   this.mouseFrom = null
 
   this.onTouchStart = (e) => {
-    if (e.target.closest && e.target.closest('#picker')) { return }
     if (e.touches.length === 2) {
       e.preventDefault()
       clearTimeout(this.longPressTimer)
@@ -197,8 +197,9 @@ function Cursor (client) {
       this.touchFrom = { startX: t.clientX, startY: t.clientY, pos }
       this.longPressTimer = setTimeout(() => {
         this.longPressTimer = null
+        if (this.touchFrom) { this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0) }
         this.touchFrom = null
-        client.picker.open()
+        this.openInlineKeyboard()
       }, 500)
     }
   }
@@ -213,6 +214,7 @@ function Cursor (client) {
         clearTimeout(this.longPressTimer)
         this.longPressTimer = null
       }
+      if (this.inlineKeyboard && Math.hypot(dx, dy) >= 8) { this.closeInlineKeyboard() }
       const pos = this.mousePick(t.clientX, t.clientY)
       this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, pos.x - this.touchFrom.pos.x, pos.y - this.touchFrom.pos.y)
       return
@@ -256,27 +258,24 @@ function Cursor (client) {
   this.onTouchEnd = (e) => {
     clearTimeout(this.longPressTimer)
     this.longPressTimer = null
-    if (e.target.closest && e.target.closest('#picker')) { this.touchFrom = null; return }
-    // Close picker on outside tap; clear double-tap state so this tap doesn't reopen it
-    if (client.picker.isVisible) {
-      client.picker.close()
-      clearTimeout(this.lastTapTimer)
-      this.lastTap = null
-      this.touchFrom = null
-      return
-    }
     if (e.touches.length < 2) { this.pinch = null }
     if (e.touches.length === 0 && this.touchFrom) {
       const t = e.changedTouches[0]
       const dx = t.clientX - this.touchFrom.startX
       const dy = t.clientY - this.touchFrom.startY
       if (Math.hypot(dx, dy) < 8) {
-        // Check for double-tap (40px tolerance for small cells)
         const now = Date.now()
-        if (this.lastTap && (now - this.lastTap.time) < 300 && Math.hypot(t.clientX - this.lastTap.x, t.clientY - this.lastTap.y) < 40) {
+        if (this.inlineKeyboard) {
+          // Keyboard open: tap selects a key or closes
+          const char = this.keyboardAt(this.touchFrom.pos.x, this.touchFrom.pos.y)
+          if (char) { this.commitKey(char) } else { this.closeInlineKeyboard() }
           clearTimeout(this.lastTapTimer)
           this.lastTap = null
-          client.picker.open()
+        } else if (this.lastTap && (now - this.lastTap.time) < 300 && Math.hypot(t.clientX - this.lastTap.x, t.clientY - this.lastTap.y) < 40) {
+          // Double-tap: open inline keyboard
+          clearTimeout(this.lastTapTimer)
+          this.lastTap = null
+          this.openInlineKeyboard()
         } else {
           // Single tap: check for action row hit, otherwise place cursor
           const action = this.actionAt(this.touchFrom.pos.x, this.touchFrom.pos.y)
@@ -338,6 +337,42 @@ function Cursor (client) {
     }
   }
 
+  this.openInlineKeyboard = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789*#:%!?;=$'
+    const W = 8; const H = 6
+    let ox = clamp(this.x - 4, 0, Math.max(0, client.orca.w - W))
+    let oy = clamp(this.y - 2, 0, Math.max(0, client.orca.h - H))
+    const cells = []
+    let ci = 0
+    for (let row = 0; row < H; row++) {
+      for (let col = 0; col < W; col++) {
+        const gx = ox + col; const gy = oy + row
+        if (gx === this.x && gy === this.y) { continue }
+        if (ci < chars.length) { cells.push({ gx, gy, char: chars[ci++] }) }
+      }
+    }
+    this.inlineKeyboard = { cells }
+    client.update()
+  }
+
+  this.keyboardAt = (x, y) => {
+    if (!this.inlineKeyboard) { return null }
+    const cell = this.inlineKeyboard.cells.find(c => c.gx === x && c.gy === y)
+    return cell ? cell.char : null
+  }
+
+  this.commitKey = (char) => {
+    this.inlineKeyboard = null
+    this.write(char)
+    client.update()
+  }
+
+  this.closeInlineKeyboard = () => {
+    if (!this.inlineKeyboard) { return }
+    this.inlineKeyboard = null
+    client.update()
+  }
+
   this.actionAt = (x, y) => {
     if (this.w === 0 && this.h === 0) { return null }
     let actionY = this.maxY + 1
@@ -353,9 +388,13 @@ function Cursor (client) {
   }
 
   this.onMouseDown = (e) => {
-    if (e.target.closest && e.target.closest('#picker')) { return }
     if (e.button !== 0) { this.cut(); return }
     const pos = this.mousePick(e.clientX, e.clientY)
+    if (this.inlineKeyboard) {
+      const char = this.keyboardAt(pos.x, pos.y)
+      if (char) { this.commitKey(char) } else { this.closeInlineKeyboard() }
+      return
+    }
     const action = this.actionAt(pos.x, pos.y)
     if (action) { if (action === 'copy') { this.clipboard = this.selection() } this[action](); if (action !== 'paste') { this.select(this.x, this.y, 0, 0) } return }
     this.select(pos.x, pos.y, 0, 0)

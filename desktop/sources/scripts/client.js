@@ -171,6 +171,7 @@ function Client () {
     this.ports = this.findPorts()
     this.drawProgram()
     this.drawSelectionActions()
+    this.drawInlineKeyboard()
     this.drawInterface()
     this.drawGuide()
   }
@@ -350,6 +351,19 @@ function Client () {
         // Make Style
         this.drawSprite(sx, sy, glyph, this.makeStyle(gx, gy, glyph, selection))
       }
+    }
+  }
+
+  this.drawInlineKeyboard = () => {
+    const kb = this.cursor.inlineKeyboard
+    if (!kb) { return }
+    const vt = this.getVisibleTiles()
+    for (const { gx, gy, char } of kb.cells) {
+      if (gx < 0 || gx >= this.orca.w || gy < 0 || gy >= this.orca.h) { continue }
+      const sx = gx - this.viewport.x
+      const sy = gy - this.viewport.y
+      if (sx < 0 || sx >= vt.w || sy < 0 || sy >= vt.h) { continue }
+      this.drawSprite(sx, sy, char, 12)
     }
   }
 
