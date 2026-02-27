@@ -329,6 +329,7 @@ function Cursor (client) {
   }
 
   this.onMouseDown = (e) => {
+    if (e.target.closest && e.target.closest('#picker')) { return }
     if (e.button !== 0) { this.cut(); return }
     const pos = this.mousePick(e.clientX, e.clientY)
     this.select(pos.x, pos.y, 0, 0)
