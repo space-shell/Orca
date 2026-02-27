@@ -272,10 +272,10 @@ function Cursor (client) {
           clearTimeout(this.lastTapTimer)
           this.lastTap = null
         } else if (this.lastTap && (now - this.lastTap.time) < 300 && Math.hypot(t.clientX - this.lastTap.x, t.clientY - this.lastTap.y) < 40) {
-          // Double-tap: open inline keyboard
+          // Double-tap: open inline keyboard with zoom
           clearTimeout(this.lastTapTimer)
           this.lastTap = null
-          this.openInlineKeyboard()
+          this.openInlineKeyboard(true)
         } else {
           // Single tap: check for action row hit, otherwise place cursor
           const action = this.actionAt(this.touchFrom.pos.x, this.touchFrom.pos.y)
@@ -337,11 +337,11 @@ function Cursor (client) {
     }
   }
 
-  this.openInlineKeyboard = () => {
+  this.openInlineKeyboard = (zoomIn = false) => {
     const chars = '0123456789abcdefghijklmnopqrstuvwxyz*#:%!?;=$^~'
     const W = 8; const H = 6
-    let ox = clamp(this.x - 4, 0, Math.max(0, client.orca.w - W))
-    let oy = clamp(this.y - 2, 0, Math.max(0, client.orca.h - H))
+    const ox = clamp(this.x - 4, 0, Math.max(0, client.orca.w - W))
+    const oy = clamp(this.y - 2, 0, Math.max(0, client.orca.h - H))
     const cells = []
     let ci = 0
     for (let row = 0; row < H; row++) {
@@ -351,8 +351,20 @@ function Cursor (client) {
         if (ci < chars.length) { cells.push({ gx, gy, char: chars[ci++] }) }
       }
     }
-    this.inlineKeyboard = { cells, shifted: false }
-    client.update()
+    let saved = null
+    if (zoomIn) {
+      saved = { tile: { w: client.tile.w, h: client.tile.h }, viewport: { x: client.viewport.x, y: client.viewport.y } }
+      const newTileW = Math.min(40, Math.floor((window.innerWidth - 60) / 10))
+      const newTileH = Math.round(newTileW * 1.5)
+      const newVisW = Math.ceil((window.innerWidth - 60) / newTileW)
+      const newVisH = Math.ceil((window.innerHeight - 60 - newTileH * 2) / newTileH)
+      client.viewport.x = Math.max(0, ox - Math.floor((newVisW - W) / 2))
+      client.viewport.y = Math.max(0, oy - Math.floor((newVisH - H) / 2))
+      client.tile = { w: newTileW, h: newTileH, ws: Math.floor(newTileW * client.scale), hs: Math.floor(newTileH * client.scale) }
+      client.resize()
+    }
+    this.inlineKeyboard = { cells, shifted: false, saved }
+    if (!zoomIn) { client.update() }
   }
 
   this.keyboardAt = (x, y) => {
@@ -368,11 +380,12 @@ function Cursor (client) {
       return
     }
     const shifted = this.inlineKeyboard.shifted
-    this.inlineKeyboard = null
     if (char === '~') {
+      this.closeInlineKeyboard()
       client.orca.write(this.x, this.y, '.')
       client.history.record(client.orca.s)
     } else {
+      this.closeInlineKeyboard()
       this.write(shifted && /^[a-z]$/.test(char) ? char.toUpperCase() : char)
     }
     client.update()
@@ -380,8 +393,16 @@ function Cursor (client) {
 
   this.closeInlineKeyboard = () => {
     if (!this.inlineKeyboard) { return }
+    const saved = this.inlineKeyboard.saved
     this.inlineKeyboard = null
-    client.update()
+    if (saved) {
+      client.tile = { w: saved.tile.w, h: saved.tile.h, ws: Math.floor(saved.tile.w * client.scale), hs: Math.floor(saved.tile.h * client.scale) }
+      client.viewport.x = saved.viewport.x
+      client.viewport.y = saved.viewport.y
+      client.resize()
+    } else {
+      client.update()
+    }
   }
 
   this.actionAt = (x, y) => {
