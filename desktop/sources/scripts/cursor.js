@@ -19,6 +19,7 @@ function Cursor (client) {
   this.lastTapTimer = null
   this.wheelZoomAccum = 0
   this.wheelScrollAccum = { x: 0, y: 0 }
+  this.clipboard = null
 
   this.start = () => {
     document.onmousedown = this.onMouseDown
@@ -280,7 +281,9 @@ function Cursor (client) {
           // Single tap: check for action row hit, otherwise place cursor
           const action = this.actionAt(this.touchFrom.pos.x, this.touchFrom.pos.y)
           if (action) {
+            if (action === 'copy') { this.clipboard = this.selection() }
             this[action]()
+            if (action !== 'paste') { this.select(this.x, this.y, 0, 0) }
             clearTimeout(this.lastTapTimer)
             this.lastTap = null
           } else {
@@ -354,7 +357,7 @@ function Cursor (client) {
     if (e.button !== 0) { this.cut(); return }
     const pos = this.mousePick(e.clientX, e.clientY)
     const action = this.actionAt(pos.x, pos.y)
-    if (action) { this[action](); return }
+    if (action) { if (action === 'copy') { this.clipboard = this.selection() } this[action](); if (action !== 'paste') { this.select(this.x, this.y, 0, 0) } return }
     this.select(pos.x, pos.y, 0, 0)
     this.mouseFrom = pos
   }
@@ -392,8 +395,23 @@ function Cursor (client) {
     document.execCommand('cut')
   }
 
-  this.paste = function (overlap = false) {
-    document.execCommand('paste')
+  this.paste = function () {
+    const apply = (data) => {
+      if (!data || !data.trim()) { return }
+      client.orca.writeBlock(this.minX, this.minY, data.trim(), this.ins)
+      client.history.record(client.orca.s)
+      this.select(this.x, this.y, 0, 0)
+      client.update()
+    }
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(apply).catch(() => {
+        this.clipboard ? apply(this.clipboard) : document.execCommand('paste')
+      })
+    } else if (this.clipboard) {
+      apply(this.clipboard)
+    } else {
+      document.execCommand('paste')
+    }
   }
 
   this.onCopy = (e) => {
