@@ -170,6 +170,7 @@ function Client () {
     this.clear()
     this.ports = this.findPorts()
     this.drawProgram()
+    this.drawSelectionActions()
     this.drawInterface()
     this.drawGuide()
   }
@@ -318,6 +319,8 @@ function Client () {
     if (type === 10) { return { bg: this.theme.active.background, fg: this.theme.active.f_high } }
     // Clock(yellow fg)
     if (type === 11) { return { fg: this.theme.active.b_inv } }
+    // Selection Action
+    if (type === 12) { return { bg: this.theme.active.b_med, fg: this.theme.active.background } }
     // Default
     return { fg: this.theme.active.f_low }
   }
@@ -346,6 +349,26 @@ function Client () {
         const glyph = g !== '.' ? g : this.isCursor(gx, gy) ? (this.clock.isPaused ? '~' : '@') : this.isMarker(gx, gy) ? '+' : g
         // Make Style
         this.drawSprite(sx, sy, glyph, this.makeStyle(gx, gy, glyph, selection))
+      }
+    }
+  }
+
+  this.drawSelectionActions = () => {
+    if (this.cursor.w === 0 && this.cursor.h === 0) { return }
+    let actionY = this.cursor.maxY + 1
+    if (actionY >= this.orca.h) { actionY = this.cursor.minY - 1 }
+    if (actionY < 0 || actionY >= this.orca.h) { return }
+    const vt = this.getVisibleTiles()
+    const sy = actionY - this.viewport.y
+    if (sy < 0 || sy >= vt.h) { return }
+    const labels = [['copy', 0], ['paste', 5], ['erase', 11]]
+    for (const [label, offset] of labels) {
+      for (let i = 0; i < label.length; i++) {
+        const gx = this.cursor.minX + offset + i
+        if (gx < 0 || gx >= this.orca.w) { continue }
+        const sx = gx - this.viewport.x
+        if (sx < 0 || sx >= vt.w) { continue }
+        this.drawSprite(sx, sy, label[i], 12)
       }
     }
   }

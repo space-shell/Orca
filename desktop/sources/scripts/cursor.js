@@ -277,11 +277,18 @@ function Cursor (client) {
           this.lastTap = null
           client.picker.open()
         } else {
-          // Single tap: place cursor, open double-tap window
-          this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0)
-          clearTimeout(this.lastTapTimer)
-          this.lastTap = { time: now, x: t.clientX, y: t.clientY }
-          this.lastTapTimer = setTimeout(() => { this.lastTap = null }, 300)
+          // Single tap: check for action row hit, otherwise place cursor
+          const action = this.actionAt(this.touchFrom.pos.x, this.touchFrom.pos.y)
+          if (action) {
+            this[action]()
+            clearTimeout(this.lastTapTimer)
+            this.lastTap = null
+          } else {
+            this.select(this.touchFrom.pos.x, this.touchFrom.pos.y, 0, 0)
+            clearTimeout(this.lastTapTimer)
+            this.lastTap = { time: now, x: t.clientX, y: t.clientY }
+            this.lastTapTimer = setTimeout(() => { this.lastTap = null }, 300)
+          }
         }
       } else {
         // Drag ended: cancel any pending double-tap
@@ -328,10 +335,26 @@ function Cursor (client) {
     }
   }
 
+  this.actionAt = (x, y) => {
+    if (this.w === 0 && this.h === 0) { return null }
+    let actionY = this.maxY + 1
+    if (actionY >= client.orca.h) { actionY = this.minY - 1 }
+    if (actionY < 0 || actionY >= client.orca.h) { return null }
+    if (y !== actionY) { return null }
+    const labels = [['copy', 0], ['paste', 5], ['erase', 11]]
+    for (const [label, offset] of labels) {
+      const x0 = this.minX + offset
+      if (x >= x0 && x < x0 + label.length) { return label }
+    }
+    return null
+  }
+
   this.onMouseDown = (e) => {
     if (e.target.closest && e.target.closest('#picker')) { return }
     if (e.button !== 0) { this.cut(); return }
     const pos = this.mousePick(e.clientX, e.clientY)
+    const action = this.actionAt(pos.x, pos.y)
+    if (action) { this[action](); return }
     this.select(pos.x, pos.y, 0, 0)
     this.mouseFrom = pos
   }
